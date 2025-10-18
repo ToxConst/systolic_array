@@ -107,7 +107,7 @@ def float32_to_fp8e4m3(x: np.ndarray) -> np.ndarray:
 
     return out
 
-def fp8_to_float32(b: np.ndarray, fmt: FP8Format) -> np.ndarray:
+def fp8_to_float32(x: np.ndarray) -> np.ndarray:
   return 0
 
 
