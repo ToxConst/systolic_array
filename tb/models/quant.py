@@ -88,3 +88,12 @@ def ulp_error(ref32, test32):
     def to_magnitude(u):
         return np.where(u & 0x80000000, 0x80000000 - (u & 0x7fffffff), u | 0x80000000)
     return np.abs(to_magnitude(ref_bits) - to_magnitude(test_bits)).astype(np.uint32)
+
+def test_bf16_matches_numpy():
+    x = np.linspace(-1e5, 1e5, 10000).astype(np.float32)
+    ours_bf = float32_to_bf16(x)
+    ours = bf16_to_float32(ours_bf)
+    ref = np.asarray(x, dtype=np.bfloat16).astype(np.float32)
+    assert np.array_equal(ours.view(np.uint32), ref.view(np.uint32))
+
+test_bf16_matches_numpy()
