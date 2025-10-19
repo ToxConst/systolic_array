@@ -24,17 +24,6 @@ def bf16_to_float32(bf: np.ndarray) -> np.ndarray:
     return (bf.astype(np.uint32) << 16).view(np.float32)
 
 
-# --- FP8 helpers (E4M3 and E5M2) ---
-# class FP8Format:
-#     def __init__(self, exp_bits, man_bits, exp_bias):
-#         self.e = exp_bits
-#         self.m = man_bits
-#         self.bias = exp_bias
-#         self.max_exp = (1 << exp_bits) - 1
-
-# E4M3 = FP8Format(4,3, exp_bias=7)
-# E5M2 = FP8Format(5,2, exp_bias=15)
-
 def float32_to_fp8e4m3(x: np.ndarray) -> np.ndarray:
     if x.dtype != np.float32:
         x = x.astype(np.float32, copy=False)
@@ -58,7 +47,7 @@ def float32_to_fp8e4m3(x: np.ndarray) -> np.ndarray:
     min_normal = np.exp2(1 - bias)  # 2^-6
 
     norm = ~(is_nan | is_inf | is_zero)
-    # (for now) require normal magnitude:
+
     norm = norm & (ax >= min_normal)
 
     if np.any(norm):
@@ -107,67 +96,167 @@ def float32_to_fp8e4m3(x: np.ndarray) -> np.ndarray:
 
     return out
 
-def fp8_to_float32(x: np.ndarray) -> np.ndarray:
-  return 0
+
+def fp8e4m3_to_float32(b: np.ndarray) -> np.ndarray:
+    b = b.astype(np.uint8, copy=False)
+
+    s = (b >> 7) & 0x1          # sign
+    e = (b >> 3) & 0xF          # 4-bit exponent
+    m =  b       & 0x7          # 3-bit mantissa
+
+    is_spc = (e == 0xF)         # exp=1111 => Inf/NaN
+    is_sub = (e == 0)           # exp=0000 => subnormal/zero
+
+    # mantissa as float32: add hidden 1 only for normals
+    mant = m.astype(np.float32) / (2**3)
+    mant = np.where(is_sub, mant / 2.0, mant + 1.0)
+
+    # exponent (int): normals use e-bias, subs use 1-bias
+    exp  = np.where(is_sub, 1 - 7, e.astype(np.int32) - 7)
+
+    # compose
+    x = mant * np.exp2(exp.astype(np.float32))
+
+    # specials
+    x = np.where(is_spc & (m == 0), np.inf, x)   # ±Inf
+    x = np.where(is_spc & (m != 0), np.nan, x)   # NaN
+
+    # apply sign
+    x = np.where(s == 1, -x, x)
+    return x.astype(np.float32)
+
+def float32_to_fp8e5m2(x: np.ndarray) -> np.ndarray:
+    if x.dtype != np.float32:
+        x = x.astype(np.float32, copy=False)
+
+    s  = np.signbit(x).astype(np.uint8)
+    ax = np.abs(x)
+
+    is_nan  = np.isnan(ax)
+    is_inf  = np.isinf(ax)
+    is_zero = (ax == 0.0)
+
+    out = np.zeros(ax.shape, dtype=np.uint8)
+
+    # Specials
+    out = np.where(is_nan,  (s<<7) | (0x1F<<2) | 0x1, out)  # qNaN payload=1
+    out = np.where(is_inf,  (s<<7) | (0x1F<<2),       out)  # ±Inf
+    out = np.where(is_zero, (s<<7) | 0x00,            out)  # ±0
+
+    # ---- Normals (ax >= min_normal) ----
+    bias, m, max_e = 15, 2, 0x1F
+    max_finite_e = max_e - 1                   # 30
+    min_normal   = np.exp2(1 - bias)           # 2^-14
+
+    norm = ~(is_nan | is_inf | is_zero) & (ax >= min_normal)
+    if np.any(norm):
+        axn = ax[norm]; sn = s[norm]
+
+        mant, exp = np.frexp(axn)              # mant in [0.5,1)
+        z   = mant * (2**(m+1))                # include hidden bit → * 4
+        mi  = np.floor(z).astype(np.int32)
+        frac= z - mi
+        rnd = (frac > 0.5) | ((frac == 0.5) & ((mi & 1) == 1))
+        mi  = mi + rnd.astype(np.int32)
+
+        # hidden-bit carry into exponent
+        overflow = (mi >> (m+1)) & 1
+        mi  = mi - (overflow << (m+1))
+        exp = exp + overflow
+
+        e_field = exp - 1 + bias
+
+        # saturate to max finite when too big
+        too_big = e_field > max_finite_e
+        e_final = np.where(too_big, max_finite_e, e_field)
+        m_final = np.where(too_big, (1<<m)-1, (mi & ((1<<m)-1))).astype(np.uint8)
+
+        out[norm] = ((sn << 7)
+                     | (e_final.astype(np.uint8) << m)
+                     | m_final)
+
+    sub = ~(is_nan | is_inf | is_zero) & (ax < min_normal)
+    if np.any(sub):
+        axs = ax[sub]; ss = s[sub]
+
+        # Scale real value into subnormal mantissa space (no hidden 1)
+        # mant_sub_real = ax / 2^(1-bias) * 2^m
+        z   = axs / np.exp2(1 - bias) * (2**m)
+        mi  = np.floor(z).astype(np.int32)
+        frac= z - mi
+        rnd = (frac > 0.5) | ((frac == 0.5) & ((mi & 1) == 1))
+        mi  = mi + rnd.astype(np.int32)
+        mi  = np.clip(mi, 0, (1<<m)-1)
+
+        out[sub] = ((ss << 7) | mi.astype(np.uint8))
+
+    return out
+
+def fp8e5m2_to_float32(b: np.ndarray) -> np.ndarray:
+    b = b.astype(np.uint8, copy=False)
+
+    s = (b >> 7) & 1
+    e = (b >> 2) & 0x1F
+    m = b & 0x3
+
+    is_spc = (e == 0x1F)         # 31
+    is_sub = (e == 0)
+
+    # Mantissa (float32) — add hidden 1 only for normals
+    mant = m.astype(np.float32) / (2**2)
+    mant = np.where(is_sub, mant / 2.0, mant + 1.0)
+
+    # Exponent (int) — subnormals use 1-bias
+    exp = np.where(is_sub, 1 - 15, e.astype(np.int32) - 15)
+
+    # Compose value
+    x = mant * np.exp2(exp.astype(np.float32))
+
+    # Specials: Inf / NaN
+    x = np.where(is_spc & (m == 0), np.inf, x)
+    x = np.where(is_spc & (m != 0), np.nan, x)
+
+    # Apply sign
+    x = np.where(s == 1, -x, x)
+    return x.astype(np.float32)
 
 
+def matmul_oracle(A32: np.ndarray, B32: np.ndarray) -> np.ndarray:
+    """Float32 golden matmul."""
+    return (A32.astype(np.float32) @ B32.astype(np.float32)).astype(np.float32)
 
-def matmul_oracle(A32, B32):
-    return A32 @ B32
+def ulp_error(ref32, test32, mask_finite=True):
+    ref32 = ref32.astype(np.float32, copy=False)
+    test32 = test32.astype(np.float32, copy=False)
+    if mask_finite:
+        finite = np.isfinite(ref32) & np.isfinite(test32)
+        if not finite.any():
+            return np.zeros(0, dtype=np.uint32)
+        ref32, test32 = ref32[finite], test32[finite]
 
-def ulp_error(ref32, test32):
-    ref_bits = ref32.view(np.uint32)
-    test_bits = test32.view(np.uint32)
-    def to_magnitude(u):
-        return np.where(u & 0x80000000, 0x80000000 - (u & 0x7fffffff), u | 0x80000000)
-    return np.abs(to_magnitude(ref_bits) - to_magnitude(test_bits)).astype(np.uint32)
+    ua = ref32.view(np.uint32)
+    ub = test32.view(np.uint32)
+
+    # inline "to_mag"
+    ua_m = np.where(ua & 0x80000000, 0x80000000 - (ua & 0x7FFFFFFF), ua | 0x80000000)
+    ub_m = np.where(ub & 0x80000000, 0x80000000 - (ub & 0x7FFFFFFF), ub | 0x80000000)
+
+    return np.abs(ua_m - ub_m).astype(np.uint32)
+
 
 
 if __name__ == "__main__":
-    #test BF16 <-> F32 conversion
-    # xs = np.array([420.75], np.float32)
-    # bf = float32_to_bf16(xs); back = bf16_to_float32(bf)
-    # print([hex(int(v)) for v in bf], back)
+    rng = np.random.default_rng(0)
+    xs = (rng.standard_normal(20)*50).astype(np.float32)
 
-    #FP8 <-> F32
-    # xs = np.array([1.0, 2.0, 3.0, 0.25, 16.0], dtype=np.float32)
-    # print([hex(int(b)) for b in float32_to_fp8e4m3(xs)])
+    packed = float32_to_fp8e4m3(xs)
+    back   = fp8e4m3_to_float32(packed)
 
-    # xs = np.array([0.0, -0.0, 1.0, 2.0, 3.0, 0.25, 1e-4, np.inf, -np.inf, np.nan], dtype=np.float32)
-    # b  = float32_to_fp8e4m3(xs)
-    # print([hex(int(v)) for v in b])
-
-    # xs = np.array([0.0, -0.0, 1.0, 2.0, 3.0, 0.25, 1e-4, 1e3, 1e6, np.inf, -np.inf, np.nan],
-    #           dtype=np.float32)
+    print("xs[:5]    ", xs[:5])
+    print("packed[:5]", [hex(int(b)) for b in packed[:5]])
+    print("back[:5]  ", back[:5])
 
 
-    xs = np.array([
-    # Zeros & signs
-    0.0, -0.0,
 
-    # Simple normals
-    0.25, -0.25, 1.0, -1.0, 2.0, 3.0,
-
-    # Around the min-normal (2**-6 = 0.015625)
-    0.015625,         # exactly min-normal
-    0.016,            # slight above (still normal)
-    0.015,            # slight below (subnormal or rounds to 0)
-    -0.015,           # negative subnormal-ish
-    0.002, 0.0005,    # deeper subnormals (often → 0 after rounding)
-
-    # Tie-to-even midpoints near 1.0 and 2.0
-    1.0625,           # midway between 1.0 and 1.125 → should round to 1.0 (even)
-    2.125,            # midway between 2.0 and 2.25  → should round to 2.0 (even)
-
-    # Near the max finite (~ (2 - 2^-3) * 2^7 = 240)
-    239.5, 240.0, 241.0,   # last safe, boundary, should saturate
-    -300.0, 300.0,         # big magnitudes → saturate to 0xF7/0x77
-
-    # Specials (your packer should map these)
-    np.inf, -np.inf, np.nan
-], dtype=np.float32)
-
-    b  = float32_to_fp8e4m3(xs)
-    print([hex(int(v)) for v in b])
 
 
