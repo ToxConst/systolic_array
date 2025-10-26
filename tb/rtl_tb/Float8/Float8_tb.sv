@@ -13,6 +13,7 @@ Float8_pack #(.E(5), .M(2)) f8_pack_inst(
   .sat_o (sat_o)
 );
 
+//Currently testing : FP32 to FP8 E5M2 conversion
 initial begin
     f = $fopen("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\e4m3\\fp32_fp8e5m2_vectors.txt", "r");
     if (f == 0) begin
