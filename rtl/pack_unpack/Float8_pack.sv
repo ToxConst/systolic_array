@@ -2,7 +2,7 @@
 
 module Float8_pack #(parameter E = 4, parameter M = 3, parameter BIAS = (1 << (E-1)) - 1) (  // IEEE-style bias = 2^(E-1)-1
   input  logic [31:0] f32_i,       // IEEE-754 float32 bits
-  output logic [E+M:0] fp8_o,      // packed byte (1+E+M)
+  output logic [7:0] fp8_o,      // packed byte 
   output logic          sat_o      // 1 when saturated to max finite
 );
 
