@@ -37,9 +37,15 @@ vals += list((rng.standard_normal(64) * 50).astype(np.float32))
 
 xs = np.array(vals, dtype=np.float32)
 fp8 = quant.float32_to_fp8e4m3(xs)
+fp8_2 = quant.float32_to_fp8e5m2(xs)
 
 with open("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\e4m3\\fp32_fp8e4m3_vectors.txt", "w") as f:
     for a, b in zip(f32_hex(xs), u8_hex(fp8)):
         f.write(f"{a} {b}\n")
 
+with open("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\e4m3\\fp32_fp8e5m2_vectors.txt", "w") as f:
+    for a, b in zip(f32_hex(xs), u8_hex(fp8_2)):
+        f.write(f"{a} {b}\n")
+
 print("Wrote", len(xs), "vectors to fp32_fp8e4m3_vectors.txt")
+print("Wrote", len(xs), "vectors to fp32_fp8e5m2_vectors.txt")

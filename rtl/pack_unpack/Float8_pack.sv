@@ -1,5 +1,5 @@
+// Defaults: E4M3  (E=4, M=3, bias=7).  For E5M2: E=5, M=2 (bias=15).
 
-// Defaults: E4M3  (E=4, M=3, bias=7).  For E5M2 use E=5, M=2 (bias=15).
 module Float8_pack #(parameter E = 4, parameter M = 3, parameter BIAS = (1 << (E-1)) - 1) (  // IEEE-style bias = 2^(E-1)-1
   input  logic [31:0] f32_i,       // IEEE-754 float32 bits
   output logic [E+M:0] fp8_o,      // packed byte (1+E+M)

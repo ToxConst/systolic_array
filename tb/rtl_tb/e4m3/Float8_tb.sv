@@ -7,14 +7,14 @@ logic [7:0] exp_f8;
 
 int f, mismatches;
 
-Float8_pack #(.E(4), .M(3)) f8_pack_inst(
+Float8_pack #(.E(5), .M(2)) f8_pack_inst(
   .f32_i(f32_in),
   .fp8_o (f8_out),
   .sat_o (sat_o)
 );
 
 initial begin
-    f = $fopen("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\e4m3\\fp32_fp8e4m3_vectors.txt", "r");
+    f = $fopen("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\e4m3\\fp32_fp8e5m2_vectors.txt", "r");
     if (f == 0) begin
         $display("Failed to open input vector file");
         $stop();
