@@ -1,6 +1,6 @@
 # Random numeric driver (placeholder for RTL cocotb integration)
 import os, numpy as np, json
-from tb.models.quant import *
+from systolic_array.tb.rtl_tb.e4m3.quant import *
 
 SEEDS = int(os.environ.get("SEEDS", "100"))
 

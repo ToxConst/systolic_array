@@ -245,16 +245,16 @@ def ulp_error(ref32, test32, mask_finite=True):
 
 
 
-if __name__ == "__main__":
-    rng = np.random.default_rng(0)
-    xs = (rng.standard_normal(20)*50).astype(np.float32)
+# if __name__ == "__main__":
+#     rng = np.random.default_rng(0)
+#     xs = (rng.standard_normal(20)*50).astype(np.float32)
 
-    packed = float32_to_fp8e4m3(xs)
-    back   = fp8e4m3_to_float32(packed)
+#     packed = float32_to_fp8e4m3(xs)
+#     back   = fp8e4m3_to_float32(packed)
 
-    print("xs[:5]    ", xs[:5])
-    print("packed[:5]", [hex(int(b)) for b in packed[:5]])
-    print("back[:5]  ", back[:5])
+#     print("xs[:5]    ", xs[:5])
+#     print("packed[:5]", [hex(int(b)) for b in packed[:5]])
+#     print("back[:5]  ", back[:5])
 
 
 
