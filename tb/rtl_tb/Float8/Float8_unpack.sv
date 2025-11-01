@@ -20,7 +20,9 @@ module Float8_unpack #(parameter E = 4, parameter M = 3, parameter BIAS = (1 << 
     logic [22:0] mantissa_f32;
     logic [7:0] exponent_f32;
 
-    logic [31:0] pos;
+    int p, i;
+    logic [23:0] sig24;
+    logic [22:0] frac23;
 
     always_comb begin
         form_fp32 = 0;
@@ -34,19 +36,21 @@ module Float8_unpack #(parameter E = 4, parameter M = 3, parameter BIAS = (1 << 
             if(mantissa == 0)
                 f32_out = {sign, 31'b0};                    //+-0
             else begin
-                form_fp32 = 0;
-                unique case (mantissa)
-                    3'd1: pos = 32'h3A80_0000; // 2^-9
-                    3'd2: pos = 32'h3B00_0000; // 2^-8
-                    3'd3: pos = 32'h3B40_0000; // 3*2^-9
-                    3'd4: pos = 32'h3B80_0000; // 2^-7
-                    3'd5: pos = 32'h3BA0_0000; // 5*2^-9
-                    3'd6: pos = 32'h3BC0_0000; // 6*2^-9
-                    3'd7: pos = 32'h3BE0_0000; // 7*2^-9
-                    default: pos = 32'h0000_0000;
-                endcase
-                // apply sign (pos is +value with sign=0; copy sign into bit31)
-                f32_out = {sign, pos[30:0]};
+                p = -1;
+                for (i = M-1; i >= 0; i--) begin
+                if (mantissa[i]) begin
+                    p = i;
+                    break;
+                end
+                end
+
+                sig24        = 24'(mantissa) << (23 - p); ;
+                mantissa_f32 = sig24[22:0];
+
+                // 3) exponent = ((1 - BIAS - M) + p) + 127  ==  1 - M + DELTA + p
+                exponent_f32 = (1 - M + DELTA + p);  // cast to 8-bit
+
+                form_fp32 = 1;
             end
         end
         else begin

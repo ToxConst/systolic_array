@@ -192,33 +192,26 @@ def float32_to_fp8e5m2(x: np.ndarray) -> np.ndarray:
 
     return out
 
-def fp8e5m2_to_float32(b: np.ndarray) -> np.ndarray:
+def fp8e5m2_to_float32(b: np.ndarray, bias: int = 15) -> np.ndarray:
     b = b.astype(np.uint8, copy=False)
-
     s = (b >> 7) & 1
     e = (b >> 2) & 0x1F
-    m = b & 0x3
+    m = (b     ) & 0x03
 
-    is_spc = (e == 0x1F)         # 31
+    is_spc = (e == 0x1F)
     is_sub = (e == 0)
 
-    # Mantissa (float32) — add hidden 1 only for normals
-    mant = m.astype(np.float32) / (2**2)
-    mant = np.where(is_sub, mant / 2.0, mant + 1.0)
+    mant = m.astype(np.float32) / 4.0
+    mant = np.where(is_sub, mant, mant + 1.0)
 
-    # Exponent (int) — subnormals use 1-bias
-    exp = np.where(is_sub, 1 - 15, e.astype(np.int32) - 15)
+    exp  = np.where(is_sub, 1 - bias, e.astype(np.int32) - bias)
 
-    # Compose value
     x = mant * np.exp2(exp.astype(np.float32))
-
-    # Specials: Inf / NaN
     x = np.where(is_spc & (m == 0), np.inf, x)
     x = np.where(is_spc & (m != 0), np.nan, x)
-
-    # Apply sign
     x = np.where(s == 1, -x, x)
     return x.astype(np.float32)
+
 
 
 def matmul_oracle(A32: np.ndarray, B32: np.ndarray) -> np.ndarray:

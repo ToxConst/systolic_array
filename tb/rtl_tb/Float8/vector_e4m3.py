@@ -65,6 +65,7 @@ fp8_bytes = np.arange(256, dtype=np.uint8)
 fp32_from_e4 = quant.fp8e4m3_to_float32(fp8_bytes)
 fp32_from_e5 = quant.fp8e5m2_to_float32(fp8_bytes)
 
+
 # Write E4M3 byte->f32
 with open("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\Float8\\E4M3_float32.txt", "w") as f:
     for b, f32hex in zip(fp8_bytes, u32_hex_from_f32_array(fp32_from_e4)):
@@ -84,7 +85,3 @@ with open("C:\\Users\\adity\\Proj\\MACproj\\systolic_array\\tb\\rtl_tb\\Float8\\
     for a, b in zip(f32_hex(xs), u8_hex(fp8_2)):
         f.write(f"{a} {b}\n")
 
-
-
-print("Wrote", len(xs), "vectors to fp32_fp8e4m3_vectors.txt")
-print("Wrote", len(xs), "vectors to fp32_fp8e5m2_vectors.txt")
