@@ -1,22 +1,15 @@
-package fp_formats_pkg;
-  typedef enum logic [1:0] {FP8_E4M3=2'b00, FP8_E5M2=2'b01, BF16=2'b10} fp_mode_e;
+package fp8_params_pkg;
+  typedef enum logic [1:0] { FP8_E4M3=2'd0, FP8_E5M2=2'd1 } fp8_mode_e;
 
-  typedef struct packed {
-    logic        sign;
-    logic [4:0]  exp;
-    logic [1:0]  man;
-  } fp8_e5m2_t;
+  function automatic int bias_of(fp8_mode_e m);
+    return (m==FP8_E4M3) ? 7 : 16;      
+  endfunction
 
-  typedef struct packed {
-    logic        sign;
-    logic [3:0]  exp;
-    logic [2:0]  man;
-  } fp8_e4m3_t;
+  function automatic int e_bits_of(fp8_mode_e m);
+    return (m==FP8_E4M3) ? 4 : 5;
+  endfunction
 
-  typedef struct packed {
-    logic        sign;
-    logic [7:0]  exp;
-    logic [6:0]  man;
-  } bf16_t;
-
-endpackage : fp_formats_pkg
+  function automatic int m_bits_of(fp8_mode_e m);
+    return (m==FP8_E4M3) ? 3 : 2;
+  endfunction
+endpackage
