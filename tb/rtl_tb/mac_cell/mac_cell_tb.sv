@@ -1,97 +1,104 @@
 
 module mac_cell_tb;
 
-  // Clock/Reset
-  logic clk = 0;
-  logic rst_n = 0;
-  always #5 clk = ~clk;  // 100 MHz
+  // Clock and reset
+  logic clk;
+  logic rst_n;
 
-  // DUT IO
-  logic         mode_fp8;
-  logic         out_bf16_en;
-  logic         valid_in_a, valid_in_b;
-  logic         ready_in_a, ready_in_b;
-  logic  [7:0]  a_in, b_in;
-  logic  [7:0]  a_out, b_out;
-  logic         valid_out_a, valid_out_b;
-  logic         acc_clear, acc_en;
-  logic  [7:0]  c_out_fp8;
-  logic [15:0]  c_out_bf16;
-  logic         c_valid;
+  // Inputs
+  logic        mode_fp8, clear_accum, mac_valid, valid_in;
+  logic        out_bf16_en;
+  logic [7:0]  a_raw, b_raw;
 
-    // --- add near top of TB ---
-  logic [31:0] a_f32, b_f32;
-  logic [7:0]  a_fp8, b_fp8;
+  // Outputs
+  logic [7:0]  a_out;
+  logic [15:0] mac_packed_bf;
 
-  Float8_pack #(.E(4), .M(3)) tb_pack_a (.f32_i(a_f32), .fp8_o(a_fp8), .sat_o());
-  Float8_pack #(.E(4), .M(3)) tb_pack_b (.f32_i(b_f32), .fp8_o(b_fp8), .sat_o());
-
-  // DUT
-  mac_cell #(.ACC_STAGES(1)) dut (
-    .clk, .rst_n,
-    .mode_fp8, .out_bf16_en,
-    .valid_in_a, .valid_in_b,
-    .ready_in_a, .ready_in_b,
-    .a_in, .b_in,
-    .a_out, .b_out,
-    .valid_out_a, .valid_out_b,
-    .acc_clear, .acc_en,
-    .c_out_fp8, .c_out_bf16, .c_valid
+  // Instantiate the DUT
+  mac_cell dut (
+    .clk           (clk),
+    .rst_n         (rst_n),
+    .mode_fp8      (mode_fp8),
+    .out_bf16_en   (out_bf16_en),
+    .a_raw         (a_raw),
+    .b_raw         (b_raw),
+    .a_out         (a_out),
+    .clear_accum   (clear_accum),
+    .mac_packed_bf (mac_packed_bf),
+    .mac_valid     (mac_valid),
+    .valid_in      (valid_in)
   );
 
-  // Simple monitors
   initial begin
-    $display("[TB] Start");
-    mode_fp8      = 1'b0;  // E4M3
-    out_bf16_en   = 1'b1;
-    valid_in_a    = 1'b0;
-    valid_in_b    = 1'b0;
-    a_in = '0; b_in = '0;
-    acc_clear = 1'b0;
-    acc_en    = 1'b0;
-
-    $monitor("%0t %s%s%s",
-      $time,
-      (valid_out_a ? $sformatf(" A=%02h", a_out) : ""),
-      (valid_out_b ? $sformatf(" B=%02h", b_out) : ""),
-      (c_valid     ? $sformatf(" C:fp8=%02h bf16=%04h", c_out_fp8, c_out_bf16) : "")
-    );
-
-
-    // Reset
-    repeat (2) @(posedge clk);
-    rst_n = 0;
-    repeat (5) @(posedge clk);
-    rst_n = 1;
-    repeat (2) @(posedge clk);
-
-    a_f32 = 32'h3F800000; // 1.0f
-    b_f32 = 32'h40000000; // 2.0f
-
-    @(posedge clk);
-    a_in = a_fp8; b_in = b_fp8;
-    valid_in_a = 1; valid_in_b = 1; acc_en = 1;
-
-    @(posedge clk);
-    valid_in_a = 0; valid_in_b = 0; acc_en = 0;
-
-    // Fire 2: + 1.0 * 1.0 => 3.0 total (if no acc_clear)
-    repeat (3) @(posedge clk);
-    a_f32 = 32'h3F800000; // 1.0f
-    b_f32 = 32'h3F800000; // 1.0f
-
-    @(posedge clk);
-    a_in = a_fp8; b_in = b_fp8;
-    valid_in_a = 1; valid_in_b = 1; acc_en = 1;
-
-    @(posedge clk);
-    valid_in_a = 0; valid_in_b = 0; acc_en = 0;
-
-    // Expect: pass-through valids one cycle after inputs; c_valid after ACC_STAGES
-    repeat (10) @(posedge clk);
-    $display("[TB] Done");
-    $stop();
+    $monitor("Time: %0t | mode_fp8: %b | out_bf16_en: %b | a_raw: %h | b_raw: %h || a_out: %h | mac_packed_bf: %h",
+              $time, mode_fp8, out_bf16_en, a_raw, b_raw, a_out, mac_packed_bf);
   end
 
+  // Clock generation
+  initial begin
+    clk = 0;
+    rst_n = 0;
+
+    @(posedge clk);
+    @(negedge clk);
+    rst_n = 1;
+
+    // Test sequence
+    mode_fp8 = 0; // E4M3
+    out_bf16_en = 1;
+    a_raw = 8'h3C; // Example FP8 value
+    b_raw = 8'h42; // Example FP8 value
+    valid_in = 1;
+
+    @(posedge clk);
+    valid_in = 0;
+
+    fork
+      begin : mac_val
+        @(posedge mac_valid);
+        $display("MAC operation completed in E4M3 mode.");
+        disable timeout;
+      end
+
+      begin : timeout
+        repeat(10) @(posedge clk);
+        $display("mac_valid didnt go high");
+        $stop();
+      end
+    join
+
+
+    @(posedge clk)
+    clear_accum = 1;
+
+    @(posedge clk);
+    clear_accum = 0;
+    mode_fp8 = 1; // E5M2
+    a_raw = 8'h41; // Example FP8 value
+    b_raw = 8'h3E; // Example FP8 value
+    valid_in = 1;
+
+    @(posedge clk);
+    valid_in= 0;
+
+    fork
+      begin : mac_val2
+        @(posedge mac_valid);
+        $display("MAC operation completed in E5M2 mode.");
+        disable timeout2;
+      end
+
+      begin : timeout2
+        repeat(10) @(posedge clk);
+        $display("mac_valid didnt go high");
+        $stop();
+      end
+    join
+
+    $stop();
+
+  end
+
+  always #10 clk = ~clk; // 50MHz clock
 endmodule
 

@@ -11,7 +11,7 @@ cModel Technology
 dC:/intelFPGA/20.1/modelsim_ase/win32aloem
 vbf16_pack
 Z0 DXx6 sv_std 3 std 0 22 VYECXdT12H8WgbUP_5Y6:3
-Z1 !s110 1762321077
+Z1 !s110 1762407671
 !i10b 1
 !s100 ehUnXo[7f_T0nl5@WN^Dh2
 Z2 !s11b Dg1SIo80bB@j0V0VzS_@n1
@@ -22,13 +22,13 @@ Z4 dC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell
 w1760852216
 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/bf16_pack.sv
 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/bf16_pack.sv
-!i122 0
+!i122 38
 L0 1 22
 Z5 OV;L;2020.1;71
 r1
 !s85 0
 31
-Z6 !s108 1762321077.000000
+Z6 !s108 1762407671.000000
 !s107 C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/bf16_pack.sv|
 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/bf16_pack.sv|
 !i113 1
@@ -47,7 +47,7 @@ R4
 w1760852796
 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/bf16_unpack.sv
 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/bf16_unpack.sv
-!i122 1
+!i122 39
 L0 1 6
 R5
 r1
@@ -72,7 +72,7 @@ R4
 w1761456705
 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/Float8_pack.sv
 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/Float8_pack.sv
-!i122 2
+!i122 40
 L0 3 153
 R5
 r1
@@ -98,7 +98,7 @@ R4
 w1762020262
 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/Float8_unpack.sv
 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/Float8_unpack.sv
-!i122 3
+!i122 41
 L0 1 67
 R5
 r1
@@ -113,24 +113,24 @@ R8
 n@float8_unpack
 vmac_cell
 R0
-!s110 1762396002
+!s110 1762408675
 !i10b 1
-!s100 JknNY_:KkFFl>Y0a1[8dS2
+!s100 8iI;j:oRfn^WVcl8MleKR2
 R2
-II2WdPD[^>KJ8_CANZ1G9o2
+IfY8Gg6BA4[M]A0ff94^Bf1
 R3
 S1
 R4
-w1762395997
+w1762408672
 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell.sv
 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell.sv
-!i122 24
-L0 3 170
+!i122 51
+L0 116 103
 R5
 r1
 !s85 0
 31
-!s108 1762396002.000000
+!s108 1762408675.000000
 !s107 C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell.sv|
 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell.sv|
 !i113 1
@@ -138,74 +138,49 @@ R7
 R8
 vmac_cell_tb
 R0
-!s110 1762395473
+!s110 1762408535
 !i10b 1
-!s100 LJFQ[8DVO:hf_I<h:Vb;f1
+!s100 TZbIGYm07OWzT[>aXL>h[3
 R2
-IH?8gO_XH5?CWkLQCl3M3>3
+IQVjoBZ9=FkV@0e=D_i5eA0
 R3
 S1
 R4
-w1762395466
-Z9 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv
-Z10 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv
-!i122 23
-L0 2 95
+w1762408527
+8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv
+FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv
+!i122 50
+L0 2 102
 R5
 r1
 !s85 0
 31
-!s108 1762395473.000000
-Z11 !s107 C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv|
-Z12 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv|
-!i113 1
-R7
-R8
-vmac_tb
-R0
-!s110 1762324072
-!i10b 1
-!s100 [`@5YR3e@WAK`cW4]iA[K0
-R2
-I]nkFhm^OG1`4SzkPRm6K22
-R3
-S1
-R4
-w1762324065
-R9
-R10
-!i122 14
-L0 3 163
-R5
-r1
-!s85 0
-31
-!s108 1762324072.000000
-R11
-R12
+!s108 1762408535.000000
+!s107 C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv|
+!s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv|
 !i113 1
 R7
 R8
 vsim_fp_mac
 R0
-!s110 1762322417
+R1
 !i10b 1
-!s100 ckk4VEZW2QZH`DiRXb`IN3
+!s100 07QPD5=omTARObGTGabUR1
 R2
-IUQI;Jbo>caR>K0zc6UkkZ0
+I@P3@Tc`GOkI:HBPW=Zj;d1
 R3
 S1
 R4
-w1762321980
+w1762401925
 8C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/sim_fp_mac.sv
 FC:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/sim_fp_mac.sv
-!i122 7
-L0 7 36
+!i122 44
+L0 6 32
 R5
 r1
 !s85 0
 31
-!s108 1762322417.000000
+R6
 !s107 C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/sim_fp_mac.sv|
 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/sim_fp_mac.sv|
 !i113 1

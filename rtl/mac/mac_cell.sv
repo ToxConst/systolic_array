@@ -1,214 +1,218 @@
-// Systolic PE with three streams: A-east (FP8), B-south (FP8), C-south (FP32/BF16)
-module mac_cell #(
-  parameter int MAC_LAT     = 1,   // latency of the MAC core (matches sim DW)
-  parameter int ACC_STAGES  = 1,   // extra output pipe after MAC (>=1)
-  parameter bit PIPE_AB_1CYC= 1    // 1: register A/B pass-through by one cycle
-) (
-  input  logic        clk,
-  input  logic        rst_n,
 
-  // Control
-  input  logic        mode_fp8,       // 0:E4M3, 1:E5M2
-  input  logic        out_bf16_en,    // 1: also produce BF16
-  input  logic        clr_acc,        // top row or new window: inject psum=0 for next MAC
+// //A flows west to east, accumulated result goes out (a*b + c)
+// module mac_cell (
+//   input  logic         clk,
+//   input  logic         rst_n,
 
-  // A stream (west -> east), FP8
-  input  logic        valid_in_a,
-  output logic        ready_in_a,
-  input  logic [7:0]  a_in,
-  output logic        valid_out_a,
-  input  logic        ready_out_a,
-  output logic [7:0]  a_out,
+//   input  logic         mode_fp8,       // 0:E4M3, 1:E5M2
+//   input  logic         out_bf16_en,    // 1: drive BF16, else FP8
 
-  // B stream (north -> south), FP8
-  input  logic        valid_in_b,
-  output logic        ready_in_b,
-  input  logic [7:0]  b_in,
-  output logic        valid_out_b,
-  input  logic        ready_out_b,
-  output logic [7:0]  b_out,
+//   input logic clear_accum,
 
-  // C stream (north -> south), FP32/BF16 partial sums/results
-  input  logic        valid_in_c,          // psum from north (0/ignored when clr_acc=1)
-  output logic        ready_in_c,
-  input  logic [31:0] c_in_fp32,
+//   input logic [7:0] a_raw, b_raw,
+//   output logic [7:0] a_out,
+//   output logic [15:0] mac_packed_bf
+//   output logic mac_valid
+// );
 
-  output logic        valid_out_c,
-  input  logic        ready_out_c,
-  output logic [31:0] acc_fp32,            // psum/result southbound
-  output logic [15:0] acc_bf16,            // optional BF16 (gated by out_bf16_en)
+//   logic [31:0] mac_z, c_in, a_fp32_e4, a_fp32_e5, b_fp32_e4, b_fp32_e5, a_float32, b_float32;
+//   logic [7:0] mac_status, a_in, b_in;
 
-  // Status for the C stream (aligned with valid_out_c)
-  output logic [7:0]  mac_status_o
+//   logic [15:0] mac_packed;
+
+//   always_ff@(posedge or negedge rst_n) begin
+//     if(!rst_n) begin
+//       a_in <= 0;
+//       b_in <= 0;
+//     end
+//     else begin
+//       a_in  <= a_raw;
+//       b_in <= b_raw;
+//       mac_valid <= 0;
+
+//     end
+
+//   end
+
+//   always_ff@(posedge clk or negedge rst_n) begin
+//     if(!rst_n) begin
+//       mac_packed_bf <= 0;
+//       mac_valid <= 0;
+//       a_out <= 0;
+//     end
+//     else begin
+//       mac_packed_bf <= mac_packed
+//       mac_valid <= 1;
+//       a_out <= a_raw;
+//     end
+//   end
+
+//   //Mac feedback loop
+//   always_ff@(posedge clk or negedge rst_n)
+//     if(!rst_n) begin
+//       c_in <= 0;
+
+//     else if (clear_accum | mac_valid)
+//       c_in <= 0;
+
+//     else
+//       c_in <= mac_z;
+//   end
+
+
+//   //E4M3 path
+//   Float8_unpack #(.E(4), .M(3)) u_unpack_a_e4 (.fp8_in(a_raw), .f32_out(a_fp32_e4));
+//   Float8_unpack #(.E(4), .M(3)) u_unpack_b_e4 (.fp8_in(b_raw), .f32_out(b_fp32_e4));
+
+//   //E5M2 Path
+//   Float8_unpack #(.E(5), .M(2)) u_unpack_a_e5 (.fp8_in(a_raw), .f32_out(a_fp32_e5));
+//   Float8_unpack #(.E(5), .M(2)) u_unpack_b_e5 (.fp8_in(b_raw), .f32_out(b_fp32_e5));
+
+//   //pack accum
+//   bf16_pack output_packer(.f32_i(mac_z), .bf16_o(mac_packed));
+
+
+//   //get unpacked input values
+//   assign a_float32 = mac_valid ? 0 : mode_fp8 ? a_fp32_e5 : a_fp32_e4;
+//   assign b_float32 = mac_valid ? 0 : mode_fp8 ? b_fp32_e5 : b_fp32_e4;
+
+// ////////////////Uncomment to use designware//////////////////////////////////////////
+
+//   //`define USE_DW
+
+// ////////////////Uncomment to use designware//////////////////////////////////////////
+
+//   //Feed mac
+//   `ifdef USE_DW
+//   DW_fp_mac #(
+//     .sig_width(23), .exp_width(8), .ieee_compliance(1)
+//   ) u_mac (
+//     .a   (a_float32),
+//     .b   (b_float32),
+//     .c   (c_in),
+//     .rnd (3'b000),        // RNE
+//     .z   (mac_z),         //output
+//     .status(mac_status)
+//   );
+// `else
+//   sim_fp_mac #(
+//     .sig_width(23), .exp_width(8), .ieee_compliance(1),
+//     .LATENCY(0)
+//   ) u_mac (
+//     .a   (a_float32),
+//     .b   (b_float32),
+//     .c   (c_in),
+//     .rnd (3'b000),
+//     .z   (mac_z),          //output
+//     .status(mac_status)
+//   );
+// `endif
+
+// endmodule
+
+
+// A flows west to east; accumulated result z = a*b + c (feedback via c_in)
+// Single-shot mode: take exactly one MAC when valid_in=1, then hold until clear_accum.
+module mac_cell (
+  input  logic         clk,
+  input  logic         rst_n,
+
+  input  logic         mode_fp8,        // 0:E4M3, 1:E5M2
+  input  logic         out_bf16_en,     // (unused here; BF16 boundary)
+  input  logic         clear_accum,     // sync clear/start-over
+  input  logic         valid_in,        // NEW: present a/b this cycle for ONE MAC
+
+  input  logic [7:0]   a_raw,
+  input  logic [7:0]   b_raw,
+  output logic [7:0]   a_out,
+  output logic [15:0]  mac_packed_bf,
+  output logic         mac_valid,       // NEW: high when final result held (ready)
+  output logic         done             // NEW: latched after one MAC
 );
-  // Local parameters
-  localparam int L = (ACC_STAGES < 1) ? 1 : ACC_STAGES;
 
-  logic        v_a_q, v_b_q;
-  logic [7:0]  d_a_q, d_b_q;
+  // ---------- Internals ----------
+  logic [31:0] a_fp32_e4, a_fp32_e5;
+  logic [31:0] b_fp32_e4, b_fp32_e5;
+  logic [31:0] a_float32, b_float32;
 
-  // Handshake & do_mac for this cycle (accept only when we have all three)
-  // If clr_acc=1, allow MAC even if valid_in_c=0 (top row injects zero)
-  logic all_inputs_valid = valid_in_a & valid_in_b & (valid_in_c | clr_acc);
+  logic [31:0] mac_z;       // combinational MAC result (f32 bits)
+  logic [31:0] c_in;        // accumulator feedback (registered)
+  logic [7:0]  mac_status;  // unused for now
+  logic [15:0] mac_packed;  // combinational BF16 pack
 
-  // ----------------------------
-  // 1) FP8 -> FP32 unpack
-  // ----------------------------
-  logic [31:0] a_fp32_e4, b_fp32_e4;
-  logic [31:0] a_fp32_e5, b_fp32_e5;
-  logic [31:0] a_fp32,    b_fp32;
+  // ---------- Format select ----------
+  // Unpack FP8 -> FP32
+  Float8_unpack #(.E(4), .M(3)) u_unpack_a_e4 (.fp8_in(a_raw), .f32_out(a_fp32_e4));
+  Float8_unpack #(.E(4), .M(3)) u_unpack_b_e4 (.fp8_in(b_raw), .f32_out(b_fp32_e4));
+  Float8_unpack #(.E(5), .M(2)) u_unpack_a_e5 (.fp8_in(a_raw), .f32_out(a_fp32_e5));
+  Float8_unpack #(.E(5), .M(2)) u_unpack_b_e5 (.fp8_in(b_raw), .f32_out(b_fp32_e5));
 
+  assign a_float32 = mode_fp8 ? a_fp32_e5 : a_fp32_e4;
+  assign b_float32 = mode_fp8 ? b_fp32_e5 : b_fp32_e4;
 
-  logic [31:0] acc_pipe [0:L];   // [0] feeds MAC.c, [1] captures mac_z, ... [L] -> output
-  logic        vld_pipe [0:L];
-  logic [7:0]  stat_pipe[0:L];
-
-  logic [15:0] bf16_packed;
-
-  Float8_unpack #(.E(4), .M(3)) u_unpack_a_e4 (.fp8_in(a_in), .f32_out(a_fp32_e4));
-  Float8_unpack #(.E(4), .M(3)) u_unpack_b_e4 (.fp8_in(b_in), .f32_out(b_fp32_e4));
-  Float8_unpack #(.E(5), .M(2)) u_unpack_a_e5 (.fp8_in(a_in), .f32_out(a_fp32_e5));
-  Float8_unpack #(.E(5), .M(2)) u_unpack_b_e5 (.fp8_in(b_in), .f32_out(b_fp32_e5));
-
-  always_comb begin
-    unique case (mode_fp8)
-      1'b0: begin a_fp32 = a_fp32_e4; b_fp32 = b_fp32_e4; end // E4M3
-      1'b1: begin a_fp32 = a_fp32_e5; b_fp32 = b_fp32_e5; end // E5M2
-      default: begin a_fp32 = 32'h7FC0_0000; b_fp32 = 32'h7FC0_0000; end // qNaN
-    endcase
-  end
-
-  // ----------------------------
-  // 2) A/B pass-through lanes
-  // ----------------------------
-  generate if (PIPE_AB_1CYC) begin : g_ab_pipe
-    // simple 1-deep elastic buffer per lane
-
-    assign ready_in_a = ~v_a_q | ready_out_a;
-    assign ready_in_b = ~v_b_q | ready_out_b;
-
-    always_ff @(posedge clk or negedge rst_n) begin
-      if (!rst_n) begin
-        v_a_q <= 1'b0; d_a_q <= '0;
-        v_b_q <= 1'b0; d_b_q <= '0;
-      end else begin
-        // A lane
-        if (ready_in_a && valid_in_a) begin
-          v_a_q <= 1'b1;
-          d_a_q <= a_in;
-        end else if (ready_out_a && v_a_q) begin
-          v_a_q <= 1'b0;
-        end
-        // B lane
-        if (ready_in_b && valid_in_b) begin
-          v_b_q <= 1'b1;
-          d_b_q <= b_in;
-        end else if (ready_out_b && v_b_q) begin
-          v_b_q <= 1'b0;
-        end
-      end
-    end
-
-    assign valid_out_a = v_a_q;
-    assign a_out       = d_a_q;
-    assign valid_out_b = v_b_q;
-    assign b_out       = d_b_q;
-
-  end else begin : g_ab_wire
-    // direct wire-through (no backpressure supported)
-    assign ready_in_a  = ready_out_a; // usually 1'b1 in wire mode
-    assign ready_in_b  = ready_out_b;
-    assign valid_out_a = valid_in_a;
-    assign valid_out_b = valid_in_b;
-    assign a_out       = a_in;
-    assign b_out       = b_in;
-  end
-  endgenerate
-
-  // ----------------------------
-  // 3) Accumulator pipeline (C stream)
-  //    In array mode: z comes from the north (c_in_fp32), or 0 when clr_acc=1
-  // ----------------------------
-
-  // Ready on C-in: 1 if we will consume it (either it's valid, or clr_acc lets us ignore it)
-  // For now we don’t implement deeper buffering on C; ready follows downstream readiness loosely.
-  assign ready_in_c = 1'b1; // simple model; upgrade to elastic if needed
-
-  // Head of pipe
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      acc_pipe[0] <= 32'd0;
-      vld_pipe[0] <= 1'b0;
-      stat_pipe[0]<= 8'd0;
-    end else begin
-      vld_pipe[0] <= all_inputs_valid;
-      // z source: c_in or zero on clear
-      acc_pipe[0] <= (clr_acc) ? 32'd0 : c_in_fp32;
-      stat_pipe[0]<= 8'd0;
-    end
-  end
-
-  // The FP MAC
-  logic [31:0] mac_z;
-  logic [7:0]  mac_status;
-
+  // ---------- FP MAC core (combinational) ----------
 `ifdef USE_DW
   DW_fp_mac #(
     .sig_width(23), .exp_width(8), .ieee_compliance(1)
   ) u_mac (
-    .a   (a_fp32),
-    .b   (b_fp32),
-    .c   (acc_pipe[0]),
-    .rnd (3'b000),        // RNE
-    .z   (mac_z),
-    .status(mac_status)
+    .a      (a_float32),
+    .b      (b_float32),
+    .c      (c_in),
+    .rnd    (3'b000),     // RNE
+    .z      (mac_z),
+    .status (mac_status)
   );
 `else
   sim_fp_mac #(
     .sig_width(23), .exp_width(8), .ieee_compliance(1),
-    .LATENCY(MAC_LAT)
+    .LATENCY(0)
   ) u_mac (
-    .a   (a_fp32),
-    .b   (b_fp32),
-    .c   (acc_pipe[0]),
-    .rnd (3'b000),
-    .z   (mac_z),
-    .status(mac_status)
+    .a      (a_float32),
+    .b      (b_float32),
+    .c      (c_in),
+    .rnd    (3'b000),
+    .z      (mac_z),
+    .status (mac_status)
   );
 `endif
 
-  // Register MAC output + shift pipeline
-  genvar gi;
-  generate
-    for (gi = 1; gi <= L; gi++) begin : g_acc
-      always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-          acc_pipe[gi] <= 32'd0;
-          vld_pipe[gi] <= 1'b0;
-          stat_pipe[gi]<= 8'd0;
-        end else begin
-          acc_pipe[gi] <= (gi == 1) ? mac_z        : acc_pipe[gi-1];
-          vld_pipe[gi] <= (gi == 1) ? vld_pipe[0]  : vld_pipe[gi-1];
-          stat_pipe[gi]<= (gi == 1) ? mac_status   : stat_pipe[gi-1];
-        end
-      end
+  // ---------- One-shot control ----------
+  // done: latches on first valid_in; clears on reset/clear_accum
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n)           done <= 1'b0;
+    else if (clear_accum) done <= 1'b0;
+    else if (valid_in)    done <= 1'b1;     // take exactly one MAC
+  end
+
+  // mac_valid is high while result is held (same as done)
+  always_ff @(posedge clk)
+    mac_valid <= done;
+
+  // ---------- Feedback / registered boundary ----------
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      c_in          <= '0;
+      a_out         <= '0;
+      mac_packed_bf <= '0;
+    end else if (clear_accum) begin
+      c_in          <= '0;                 // restart accumulation
+      a_out         <= a_raw;              // systolic pass-through
+      mac_packed_bf <= mac_packed;         // register boundary output
+    end else begin
+      a_out         <= a_raw;
+      mac_packed_bf <= mac_packed;
+      // Update accumulator only on the one accepted MAC
+      if (valid_in && !done)
+        c_in <= mac_z;                     // capture z = a*b + c_in
+      else
+        c_in <= c_in;                      // hold thereafter
     end
-  endgenerate
+  end
 
-  // Tail -> C southbound
-  // (You can add an elastic buffer here if you want backpressure via ready_out_c)
-  assign acc_fp32     = acc_pipe[L];
-  assign mac_status_o = stat_pipe[L];
-
-  // Optional BF16 pack
-
-  bf16_pack u_bf16_pack (.fp32_i(acc_fp32), .bf16_o(bf16_packed));
-  assign acc_bf16 = out_bf16_en ? bf16_packed : 16'd0;
-
-  // Valid management for C
-  // If you need true backpressure, insert a 1-deep skid: here we assume ready_out_c==1.
-  assign valid_out_c = vld_pipe[L] & ready_out_c;
+  // ---------- Pack FP32 -> BF16 (combinational) ----------
+  bf16_pack u_output_packer (
+    .f32_i  (mac_z),
+    .bf16_o (mac_packed)
+  );
 
 endmodule
-
-
