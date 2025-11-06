@@ -1,0 +1,50 @@
+vsim work.mac_cell_tb
+# vsim work.mac_cell_tb 
+# Start time: 20:18:22 on Nov 05,2025
+# Loading sv_std.std
+# Loading work.mac_cell_tb
+# Loading work.Float8_pack
+# Loading work.mac_cell
+# Loading work.Float8_unpack
+# Loading work.sim_fp_mac
+add wave -position insertpoint sim:/mac_cell_tb/dut/*
+run -all
+# [TB] Start
+# 0 
+# 105  A=38 B=40
+# 115 
+# 125  C:fp8=00 bf16=0000
+# 135 
+# 155  A=38 B=38
+# 165 
+# 175  C:fp8=01 bf16=4080
+# 185 
+# [TB] Done
+# ** Note: $stop    : C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv(93)
+#    Time: 255 ps  Iteration: 1  Instance: /mac_cell_tb
+# Break in Module mac_cell_tb at C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv line 93
+# Compile of mac_cell.sv failed with 1 errors.
+# Compile of mac_cell.sv was successful.
+restart
+# ** Note: (vsim-12125) Error and warning message counts have been reset to '0' because of 'restart'.
+# Loading work.mac_cell
+# Warning in wave window restart: (vish-4014) No objects found matching '/mac_cell_tb/dut/vpipe'. 
+# Warning in wave window restart: (vish-4014) No objects found matching '/mac_cell_tb/dut/vi'. 
+run -all
+# GetModuleFileName: The specified module could not be found.
+# 
+# 
+# [TB] Start
+# 0 
+# 105  A=38 B=40
+# 115 
+# 125  C:fp8=00 bf16=0000
+# 135 
+# 155  A=38 B=38
+# 165 
+# 175  C:fp8=01 bf16=4000
+# 185 
+# [TB] Done
+# ** Note: $stop    : C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv(93)
+#    Time: 255 ps  Iteration: 1  Instance: /mac_cell_tb
+# Break in Module mac_cell_tb at C:/Users/adity/Proj/MACproj/systolic_array/tb/rtl_tb/mac_cell/mac_cell_tb.sv line 93

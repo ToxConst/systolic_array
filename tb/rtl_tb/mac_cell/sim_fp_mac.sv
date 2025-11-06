@@ -25,19 +25,19 @@ module sim_fp_mac #(
     zr = (ar * br) + cr;          // do compute in 32-bit float
   end
 
-  // Optional pipeline on output to mimic DW latency
-  logic [31:0] z_pipe [0:LATENCY];
-  integer i;
+  // // Optional pipeline on output to mimic DW latency
+  // logic [31:0] z_pipe [0:LATENCY];
+  // integer i;
 
-  always_comb z_pipe[0] = $shortrealtobits(zr);
+  // always_comb z_pipe[0] = $shortrealtobits(zr);
 
-  always_ff @(posedge $global_clock) begin
-    for (i = 1; i <= LATENCY; i++) begin
-      z_pipe[i] <= z_pipe[i-1];
-    end
-  end
+  // always_ff @(posedge $global_clock) begin
+  //   for (i = 1; i <= LATENCY; i++) begin
+  //     z_pipe[i] <= z_pipe[i-1];
+  //   end
+  // end
 
-  assign z      = z_pipe[LATENCY];
-  assign status = 8'b0;
+   assign z  = $shortrealtobits(zr);
+   assign status = 8'b0;
 endmodule
 
