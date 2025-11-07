@@ -111,37 +111,44 @@
 // endmodule
 
 
-// A flows west to east; accumulated result z = a*b + c (feedback via c_in)
-// Single-shot mode: take exactly one MAC when valid_in=1, then hold until clear_accum.
+// // A flows west->east; single-shot: accept one pair in IDLE, hold result in MAC until consumed.
 module mac_cell (
   input  logic         clk,
   input  logic         rst_n,
 
-  input  logic         mode_fp8,        // 0:E4M3, 1:E5M2
-  input  logic         out_bf16_en,     // (unused here; BF16 boundary)
-  input  logic         clear_accum,     // sync clear/start-over
-  input  logic         valid_in,        // NEW: present a/b this cycle for ONE MAC
+  input  logic         mode_fp8,         // 0:E4M3, 1:E5M2
+  input  logic         out_bf16_en,      // (unused here; BF16 boundary)
 
-  input  logic [7:0]   a_raw,
-  input  logic [7:0]   b_raw,
-  output logic [7:0]   a_out,
-  output logic [15:0]  mac_packed_bf,
-  output logic         mac_valid,       // NEW: high when final result held (ready)
-  output logic         done             // NEW: latched after one MAC
+  // Data
+  input  logic  [7:0]  a_raw,
+  input  logic  [7:0]  b_raw,
+  output logic  [7:0]  a_out,
+
+  // Handshakes
+  input  logic         valid_in,         // upstream has (a_raw,b_raw)
+  input  logic         output_ready,     // downstream can consume our result
+  output logic         input_ready_take, // we can accept one pair now
+  output logic         mac_valid,        // result valid for downstream
+  output logic         done,             // same as mac_valid (level)
+
+  // Output data
+  output logic [15:0]  mac_packed_bf
 );
 
-  // ---------- Internals ----------
-  logic [31:0] a_fp32_e4, a_fp32_e5;
-  logic [31:0] b_fp32_e4, b_fp32_e5;
+  // ======== Datapath internals ========
+  logic [31:0] a_fp32_e4, a_fp32_e5, b_fp32_e4, b_fp32_e5;
   logic [31:0] a_float32, b_float32;
+  logic [31:0] mac_z;                // combinational a*b + c
+  logic [31:0] z_reg;                // latched final result (FP32)
+  logic [31:0] c_reg;                // accumulator (single-shot => 0)
+  logic [15:0] bf16_comb;            // BF16 of z_reg (combinational)
+  logic [7:0]  mac_status;           // unused
 
-  logic [31:0] mac_z;       // combinational MAC result (f32 bits)
-  logic [31:0] c_in;        // accumulator feedback (registered)
-  logic [7:0]  mac_status;  // unused for now
-  logic [15:0] mac_packed;  // combinational BF16 pack
+  // "hold" gates MAC inputs (zeroes them) while in IDLE/MAC as commanded by the FSM
+  logic        hold, take;            // take=1 when we accept new input pair
+  logic [31:0] a_mac, b_mac, c_mac;
 
-  // ---------- Format select ----------
-  // Unpack FP8 -> FP32
+  // ======== Unpack FP8 -> FP32 & select format ========
   Float8_unpack #(.E(4), .M(3)) u_unpack_a_e4 (.fp8_in(a_raw), .f32_out(a_fp32_e4));
   Float8_unpack #(.E(4), .M(3)) u_unpack_b_e4 (.fp8_in(b_raw), .f32_out(b_fp32_e4));
   Float8_unpack #(.E(5), .M(2)) u_unpack_a_e5 (.fp8_in(a_raw), .f32_out(a_fp32_e5));
@@ -150,69 +157,92 @@ module mac_cell (
   assign a_float32 = mode_fp8 ? a_fp32_e5 : a_fp32_e4;
   assign b_float32 = mode_fp8 ? b_fp32_e5 : b_fp32_e4;
 
-  // ---------- FP MAC core (combinational) ----------
+  // Gate MAC inputs with hold (when hold=1, MAC sees zeros and does no work)
+  assign {a_mac, b_mac, c_mac} = hold ? {32'h0, 32'h0, 32'h0} : {a_float32, b_float32, c_reg};       // single-shot keeps c_reg at 0 anyway
+
+  // ======== FP MAC core (combinational) ========
 `ifdef USE_DW
-  DW_fp_mac #(
-    .sig_width(23), .exp_width(8), .ieee_compliance(1)
-  ) u_mac (
-    .a      (a_float32),
-    .b      (b_float32),
-    .c      (c_in),
-    .rnd    (3'b000),     // RNE
-    .z      (mac_z),
-    .status (mac_status)
+  DW_fp_mac #(.sig_width(23), .exp_width(8), .ieee_compliance(1)) u_mac (
+    .a(a_mac), .b(b_mac), .c(c_mac), .rnd(3'b000), .z(mac_z), .status(mac_status)
   );
 `else
-  sim_fp_mac #(
-    .sig_width(23), .exp_width(8), .ieee_compliance(1),
-    .LATENCY(0)
-  ) u_mac (
-    .a      (a_float32),
-    .b      (b_float32),
-    .c      (c_in),
-    .rnd    (3'b000),
-    .z      (mac_z),
-    .status (mac_status)
+  sim_fp_mac #(.sig_width(23), .exp_width(8), .ieee_compliance(1), .LATENCY(0)) u_mac (
+    .a(a_mac), .b(b_mac), .c(c_mac), .rnd(3'b000), .z(mac_z), .status(mac_status)
   );
 `endif
 
-  // ---------- One-shot control ----------
-  // done: latches on first valid_in; clears on reset/clear_accum
+  // Pack the *latched* result to present a stable BF16 in MAC state
+  bf16_pack u_pack (.f32_i(z_reg), .bf16_o(bf16_comb));
+
+  // ======== FSM control ========
+  typedef enum logic [0:0] { IDLE=1'b0, MAC=1'b1 } state_t;
+  state_t state, next_state;
+
+  // State flop
   always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n)           done <= 1'b0;
-    else if (clear_accum) done <= 1'b0;
-    else if (valid_in)    done <= 1'b1;     // take exactly one MAC
+    if (!rst_n)
+      state <= IDLE;
+    else
+      state <= next_state;
   end
 
-  // mac_valid is high while result is held (same as done)
-  always_ff @(posedge clk)
-    mac_valid <= done;
+  // Next-state & control outputs
+  always_comb begin
+    // defaults
+    next_state        = state;
+    input_ready_take  = 1'b0;
+    mac_valid         = 1'b0;
+    done              = 1'b0;
+    hold              = 1'b0;
+    take              = 1'b0;
 
-  // ---------- Feedback / registered boundary ----------
+    case (state)
+      IDLE: begin
+        input_ready_take = 1'b1;     // we can accept one pair now
+        take = 1'b1;
+        if (valid_in)               // accept this one pair
+          next_state = MAC;         // then move to holding state
+      end
+
+      MAC: begin
+        done       = 1'b1;
+        hold       = 1'b1;          // gate MAC inputs while holding
+        if (output_ready)           // downstream consumed our result
+          next_state = IDLE;        // re-arm for the next pair
+          mac_valid  = 1'b1;          // present held result
+      end
+    endcase
+  end
+
+  // ======== Datapath registers ========
+  // Latch result on accept; keep c_reg at zero for single-shot; register outputs
+  // "take" happens when we are in IDLE and upstream presents valid_in
+
+
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      c_in          <= '0;
-      a_out         <= '0;
-      mac_packed_bf <= '0;
-    end else if (clear_accum) begin
-      c_in          <= '0;                 // restart accumulation
-      a_out         <= a_raw;              // systolic pass-through
-      mac_packed_bf <= mac_packed;         // register boundary output
+      z_reg         <= 32'h0;
+      c_reg         <= 32'h0;
+      a_out         <= 8'h00;
+      mac_packed_bf <= 16'h0000;
     end else begin
-      a_out         <= a_raw;
-      mac_packed_bf <= mac_packed;
-      // Update accumulator only on the one accepted MAC
-      if (valid_in && !done)
-        c_in <= mac_z;                     // capture z = a*b + c_in
-      else
-        c_in <= c_in;                      // hold thereafter
+      a_out         <= a_raw;          // systolic pass-through (1-cycle)
+      mac_packed_bf <= bf16_comb;      // register BF16 boundary
+
+      if (take)
+        z_reg <= mac_z;                // capture a*b (+c) once
+
+      // single-shot: keep accumulator at zero; (for K>1, update c_reg on 'take')
+      c_reg <= 32'h0;
     end
   end
 
-  // ---------- Pack FP32 -> BF16 (combinational) ----------
-  bf16_pack u_output_packer (
-    .f32_i  (mac_z),
-    .bf16_o (mac_packed)
-  );
+  // // synopsys translate_off
+  // // Simple sanity: outputs shouldn’t be X after reset
+  // always @(posedge clk) if (rst_n) begin
+  //   if ($isunknown({mac_valid, input_ready_take, mac_packed_bf, a_out}))
+  //     $error("mac_cell: X detected on outputs at t=%0t", $time);
+  // end
+  // // synopsys translate_on
 
 endmodule
