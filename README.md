@@ -2,8 +2,6 @@
 
 An educational, verification‑driven SystemVerilog project that implements an FP8 systolic MAC tile (E4M3 & E5M2), optional BF16 output, and a self‑checking test/analysis stack (cocotb + Python oracles).
 
-> **Why it exists.** This repo aims to be a compact, recruiter‑friendly portfolio project that demonstrates RTL design + DV craft: streaming handshakes, floating‑point corner cases (RNE, NaN/Inf, subnormals), and coverage‑driven verification.
-
 ---
 
 ## Features
