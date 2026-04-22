@@ -87,17 +87,6 @@ LICENSE (MIT)
 
 ---
 
-## Roadmap
-
-* [ ] **Enable multi‑K accumulation** in `mac_cell` (uncomment/add `c_reg`, gate `take`).
-* [ ] **Add B pass‑through** to `mac_cell` (b_out/b_valid_out) to push the south fabric inside the PE.
-* [ ] **Tile controller** with `K_len` and end‑of‑wavefront signaling (`done`).
-* [ ] **FP8 output option** (select BF16 or FP8 per PE/row).
-* [ ] **DMA stub integration** for streaming matrices from SRAM/AXI‑Lite.
-* [ ] **Cocotb coverage hooks** and UVM‑lite style scoreboard.
-
----
-
 ## Getting help / contributing
 
 Issues and PRs welcome. If you spot a corner case (NaN payloads, subnormal edge, saturation), please attach a minimal waveform or Python repro.
