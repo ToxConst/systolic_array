@@ -70,7 +70,7 @@ LICENSE (MIT)
 
 ## Interfaces (PE & Tile)
 
-### mac_cell (single‑shot today)
+### mac_cell 
 
 * **Control:** `mode_fp8` (0:E4M3, 1:E5M2), `out_bf16_en` (reserved)
 * **Inputs:** `a_raw[7:0]`, `b_raw[7:0]`, `a_valid_in`, `mac_valid_in`
